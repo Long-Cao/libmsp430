@@ -7,7 +7,7 @@
  *      TLC5940 APIs, based on slvc106 - TLC5940 Programming Flowchart v0.1 (29/9/2005)
  */
 
-#include "TLC5940_api.h"
+#include "TLC5940.h"
 
 
 /********************** Variable Definitions **********************/
