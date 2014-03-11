@@ -16,9 +16,11 @@
 #include <msp430.h>
 #include <stdbool.h>		
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /********************** Pin Mapping **********************/
-
 // ***** PORT 1 *****
 // Reference clock for GS PWM control
 //#define GSCLK_PIN       BIT0    // P1.0 - ACLK signal output
@@ -115,5 +117,9 @@ extern void SerialTransmit(unsigned char *ptrData,unsigned char count);
 //extern void ErrorCheck(void);
 
 /************************************************************/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
