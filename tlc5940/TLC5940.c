@@ -9,54 +9,45 @@
 
 #include "TLC5940.h"
 
-
 /********************** Variable Definitions **********************/
-
-volatile bool fFirstCycle=false, fXLAT=TLC_LATCH_WAIT, fTLCdata=TLC_DATA_READY;
-unsigned char cntDataTLC=0, bfrSer=0;
-unsigned char dataDC[12*TLC5940_N] = {
-		//		1		2		3		4		5		6		7		8		9
-		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	//->	RGBled 1 	2	3	4
-		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	//->	RGBled 5	6	7	8
-		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	//->	RGBled 9	10	11	12
-		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	//->	RGBled 13	14	15	16
+volatile bool fFirstCycle=false, fXLAT=TLC_LATCH_WAIT, fDataGSUpd=GS_DATA_UPD_READY;
+unsigned char cntDataTLC=0, bfrSerRx=0;
+unsigned char dataDC[12*TLC5940_N]={
+//		Initial dot correction data = 50% default max output current.
+//		The maximum output current per channel is programmed by a single resistor, R(IREF), which is placed between
+//		IREF pin and GND pin. The voltage on IREF is set by an internal band gap V(IREF) with a typical value of
+//		1.24V. The maximum channel current is equivalent to the current flowing through R(IREF) multiplied by a factor of
+//		31.5. The maximum output current per channel can be calculated by Equation 6:
+//		                V(IREF)
+//		      I max = ----------- x 31.5
+//		                R(IREF)                                                                                      (6)
+//		where:
+//		     V(IREF) = 1.24 V
+//		     R(IREF) = User-selected external resistor.
+//		Imax must be set between 5 mA and 120 mA. The output current may be unstable if Imax is set lower than 5 mA.
+//		Output currents lower than 5 mA can be achieved by setting Imax to 5 mA or higher and then using dot
+//		correction.
+		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
+		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
+		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
+		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 },
-dataGS[24*TLC5940_N] = {
-		//		1		2		3		4		5		6		7		8		9
-		// Initial GS data
-		/*0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 1 	2
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 3	4
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 5	6
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 7 	8
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 9	10
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 11	12
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 13 	14
-		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	//->	RGBled 15	16*/
-
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 1 	2
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 3	4
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 5	6
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 7 	8
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 9	10
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 11	12
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 13 	14
-		0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	0xff,	//->	RGBled 15	16
+dataGS[DATA_GS_LENGTH*TLC5940_N]={
+		// No initial value defined to avoid conflict with array size
 };
-
 /******************************************************************/
 
-
 /************************** APIs *******************************/
-
 void SystemConfig_TLC(void)
 {
 	/*
-	 *	ACLK for GSCLK
-	 *	if commented out, use SMCLK for GSCLK instead
+	 * Set ACLK as configed in TLC5940_config.h
 	 */
-	// ACLK = VLOCLK
-	//BCSCTL1 &=~(XTS+DIVA1+DIVA0);
-	//BCSCTL3 |= LFXT1S_2;                      // ACLK = VLO
+#if (GSCLK_SRC==1)
+	//ACLK=VLOCLK;
+	BCSCTL1 &=~(XTS+DIVA1+DIVA0);
+	BCSCTL3 |= ACLK_SRC;                      // ACLK=VLO
+#endif
 
 	// Set GPIO direction, function and value
 	P1OUT &= ~(GSCLK_PIN + SCLK_PIN);
@@ -73,21 +64,20 @@ void SystemConfig_TLC(void)
 	P2DIR |= VPRG_PIN + DCPRG_PIN + XLAT_PIN;
 
 	// Timer A0 CCR0 to send LATCH signal
-	// Update Interval = (GSCLK_CYCLE)/(TA0CLK)
-	TA0CCR0 = GSCLK_CYCLE;
-	//TA0CTL = TASSEL_1 + MC_1 + ID_0; // TA0CLK = ACLK
-	TA0CTL = TASSEL_2 + MC_1 + ID_0; // TA0CLK = SMCLK
+	// Update Interval=(GSCLK_CYCLE)/(TA0CLK)
+	TA0CCR0=GSCLK_CYCLE;
+	//TA0CTL=TASSEL_1 + MC_1 + ID_0; // TA0CLK=ACLK
+	TA0CTL=TASSEL_2 + MC_1 + ID_0; // TA0CLK=SMCLK
 	TA0CCTL0 |= CCIE; // CCR0 interrupt enabled
 
 	// Config USCI B module - 3-pin, 8-bit SPI master
 	UCB0CTL1 |= UCSWRST;
-	UCB0CTL0 = UCCKPH + UCMSB + UCMST + UCSYNC; // 3-pin, 8-bit SPI master
+	UCB0CTL0=UCCKPH + UCMSB + UCMST + UCSYNC; // 3-pin, 8-bit SPI master
 	UCB0CTL1 |= UCSSEL_2; // SMCLK
-	UCB0BR0 = 1;	// 16MHz SCLK
-	UCB0BR1 = 0;
+	UCB0BR0=1;	// 16MHz SCLK
+	UCB0BR1=0;
 	UCB0CTL1 &= ~UCSWRST; // clear SW, start fisrt serial transmission
 }
-
 void DCInputCycle(void)
 {
 	/*
@@ -100,33 +90,30 @@ void DCInputCycle(void)
 	P2OUT &= ~XLAT_PIN;
 	// Switch from DC to GS mode
 	P2OUT &= ~VPRG_PIN;
-	fFirstCycle = true;
+	fFirstCycle=true;
 }
-
 void GSInputCycle(void)
 {
 	P1OUT &= ~BLANK_PIN;
-	if (fTLCdata==TLC_DATA_READY)
+	if (fDataGSUpd==GS_DATA_UPD_READY)
 		SerialTransmit(dataGS,TLC5940_N*24);
 }
-
 void SerialTransmit(unsigned char *ptrData,unsigned char count)
 {
-	cntDataTLC = 0;
+	cntDataTLC=0;
 	while (cntDataTLC < count)
 	{
-		UCB0TXBUF = ptrData[cntDataTLC];
+		UCB0TXBUF=ptrData[cntDataTLC];
 		while (!(IFG2 & UCB0TXIFG)); // TX buffer ready?
 		/*if ((P1IN & XERR_PIN) == 0)
-    		error[DataCnt] = UCB0RXBUF;
+    		error[DataCnt]=UCB0RXBUF;
     	else*/
-		bfrSer = UCB0RXBUF;
+		bfrSerRx=UCB0RXBUF;
 		cntDataTLC++;
 	}
-	fXLAT = TLC_LATCH_READY;
-	fTLCdata = TLC_DATA_WAIT;
+	fXLAT=TLC_LATCH_READY;
+	fDataGSUpd=GS_DATA_UPD_WAIT;
 }
-
 /*void ErrorCheck(void)
 {
 	UCB0CTL1 &= ~UCSWRST; // clear SW, start fisrt serial transmission
@@ -140,16 +127,14 @@ void SerialTransmit(unsigned char *ptrData,unsigned char count)
 		P1OUT |= BLANK_PIN; // blank all output
 		IE2 |= UCA0TXIE;
 		__bis_SR_register(LPM3_bits + GIE);       // Enter LPM3 w/ interrupts enabled
-		IE1 = 0;
-		IE2 = 0;
+		IE1=0;
+		IE2=0;
 		__bis_SR_register(GIE + LPM4_bits);
 	}
 }*/
-
 /***************************************************************/
 
-
-#pragma vector = TIMER0_A0_VECTOR
+#pragma vector=TIMER0_A0_VECTOR
 __interrupt void GSCLK_Control(void)
 {
 	P1OUT |= BLANK_PIN;
@@ -175,7 +160,7 @@ __interrupt void GSCLK_Control(void)
 /*#pragma vector=USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void)
 {
-	UCA0TXBUF = status[cntDataTLC++];
+	UCA0TXBUF=status[cntDataTLC++];
 	if (cntDataTLC==TLC5940_N*24)
 		__bic_SR_register(LPM4_bits);
 }*/

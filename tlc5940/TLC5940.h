@@ -16,6 +16,7 @@
 #include <msp430.h>
 #include <stdbool.h>		
 #include "TLC5940_config.h"
+#include "TLC5940_internal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,21 +30,15 @@ extern volatile bool fFirstCycle;
 // Latch signal flag - indicate a necessary signal when in state TLC_LATCH_READY
 extern volatile bool fXLAT;
 
-extern volatile bool fTLCdata;
-// cntDataTLC = counter for DC and GS Data
+extern volatile bool fDataGSUpd;
+// cntDataTLC=counter for serial (both DC & GS) data
 extern unsigned char cntDataTLC;
 // DC data
-// Size of array = 96 bits x number of TLC = 12 bytes * number of TLC
+// Size of array=96 bits x number of TLC=12 bytes * number of TLC
 extern unsigned char dataDC[12*TLC5940_N];
 // GS data
-// Size of array = 192 bits x number of TLC = 24 bytes * number of TLC
-extern unsigned char dataGS[24*TLC5940_N];
-// Status information array
-// Including:	Led Open Detection (LOD)
-// 				Thermal Error Flag (TEF)
-//				DC value
-// Size of array = 192 bits x number of TLC = 24 bytes * number of TLC
-extern unsigned char status[24*TLC5940_N];
+// Size of array=192 bits x number of TLC=24 bytes * number of TLC
+extern unsigned char dataGS[DATA_GS_LENGTH*TLC5940_N];
 
 extern unsigned char bfrSer;
 /*******************************************************************/
@@ -61,9 +56,17 @@ extern void GSInputCycle(void);
 
 extern void SerialTransmit(unsigned char *ptrData,unsigned char count);
 
-//extern void ErrorCheck(void);
 
 /************************************************************/
+#if (ERROR_DETECTION==1)
+// Status information array
+// Including:	Led Open Detection (LOD)
+// 				Thermal Error Flag (TEF)
+//				DC value
+// Size of array=192 bits x number of TLC=24 bytes *number of TLC
+extern unsigned char status[24*TLC5940_N];
+extern void ErrorCheck(void);
+#endif
 
 #ifdef __cplusplus
 }
