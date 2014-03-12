@@ -18,32 +18,28 @@
 extern "C" {
 #endif
 
-#define GSCLK_CYCLE		2^GS_BIT_DEPTH
-
-#if GS_BIT_DEPTH>=12
-	#error Invalid GS_BIT_DEPTH
-#endif
-#if GS_BIT_DEPTH<=8
-	#define SIMPLE_LIB
-#else
-	#define EXTENDED_LIB
-#endif
-#ifdef SIMPLE_LIB
-	#define DATA_GS_LENGTH	16
-#endif
-#ifdef EXTENDED_LIB
-	#define DATA_GS_LENGTH	16+2*(GS_BIT_DEPTH-8)
-#endif
-
-// GS data update state
+/*
+ * Configuration options
+ */
+// GS data update states
 #define GS_DATA_UPD_READY	1
 #define GS_DATA_UPD_WAIT	0
-// Latch signal state
+// Latch signal states
 #define TLC_LATCH_READY	1
 #define	TLC_LATCH_WAIT	0
+// Clock settings
+#define DEFAULT_LOW_POWER			0
+#define DEFAULT_HIGH_PERFORMANCE	1
+#define CUSTOM_CLOCK				2
 
+/*
+ * Macros
+ */
+// Absolute
+#define GSCLK_CYCLE		2^GS_BIT_DEPTH
+// Conditional
+//----- Pin mapping default
 #if (PIN_MAPPING==0)
-/********************** Pin Mapping **********************/
 // ***** PORT 1 *****
 // Reference clock for GS PWM control
 #if (GSCLK_SRC==TASSEL_2)
@@ -87,8 +83,30 @@ extern "C" {
 // register to either GS register (VPRG=low) or DC register (VPRG=high). When XLAT=low,
 // the data in GS or DC register is held constant.
 #define XLAT_PIN        BIT2    // P2.2
-/*********************************************************/
 #endif /* DEFAULT PIN MAP */
+
+//------ Bit-depth
+#if GS_BIT_DEPTH>=12
+	#error 'GS_BIT_DEPTH exceeds 12. Please decrease the value or ensure you\'re using TLC5940.'
+#endif
+#if GS_BIT_DEPTH<=8
+	#define SIMPLE_LIB
+#else
+	#define EXTENDED_LIB
+#endif
+#ifdef SIMPLE_LIB
+	#define DATA_GS_TYPE	unsigned char
+#endif
+#ifdef EXTENDED_LIB
+	#define DATA_GS_TYPE	unsigned int
+#endif
+
+//------- Clock setting default
+#if (CLOCK_SETTING==DEFAULT_LOW_POWER)
+#define GSCLK_SCR	TASSEL_1
+#define ACLK_SRC    LFXT1S_0
+#elif (CLOCK_SETTING==DEFAULT_HIGH_PERFORMANCE)
+#endif
 
 #ifdef __cplusplus
 }

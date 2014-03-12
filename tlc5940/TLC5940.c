@@ -11,42 +11,53 @@
 
 /********************** Variable Definitions **********************/
 volatile bool fFirstCycle=false, fXLAT=TLC_LATCH_WAIT, fDataGSUpd=GS_DATA_UPD_READY;
-unsigned char cntDataTLC=0, bfrSerRx=0;
-unsigned char dataDC[12*TLC5940_N]={
-//		Initial dot correction data = 50% default max output current.
-//		The maximum output current per channel is programmed by a single resistor, R(IREF), which is placed between
-//		IREF pin and GND pin. The voltage on IREF is set by an internal band gap V(IREF) with a typical value of
-//		1.24V. The maximum channel current is equivalent to the current flowing through R(IREF) multiplied by a factor of
-//		31.5. The maximum output current per channel can be calculated by Equation 6:
-//		                V(IREF)
-//		      I max = ----------- x 31.5
-//		                R(IREF)                                                                                      (6)
-//		where:
-//		     V(IREF) = 1.24 V
-//		     R(IREF) = User-selected external resistor.
-//		Imax must be set between 5 mA and 120 mA. The output current may be unstable if Imax is set lower than 5 mA.
-//		Output currents lower than 5 mA can be achieved by setting Imax to 5 mA or higher and then using dot
-//		correction.
+unsigned char cntDataTLC=0, bfrSPIRx=0;
+unsigned char \
+dataDC[12*TLC5940_N]={
+		//		Initial dot correction data = 50% default max output current.
+		//		The maximum output current per channel is programmed by a single resistor, R(IREF), which is placed between
+		//		IREF pin and GND pin. The voltage on IREF is set by an internal band gap V(IREF) with a typical value of
+		//		1.24V. The maximum channel current is equivalent to the current flowing through R(IREF) multiplied by a factor of
+		//		31.5. The maximum output current per channel can be calculated by Equation 6:
+		//		                V(IREF)
+		//		      I max = ----------- x 31.5
+		//		                R(IREF)                                                                                      (6)
+		//		where:
+		//		     V(IREF) = 1.24 V
+		//		     R(IREF) = User-selected external resistor.
+		//		Imax must be set between 5 mA and 120 mA. The output current may be unstable if Imax is set lower than 5 mA.
+		//		Output currents lower than 5 mA can be achieved by setting Imax to 5 mA or higher and then using dot
+		//		correction.
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 },
-dataGS[DATA_GS_LENGTH*TLC5940_N]={
-		// No initial value defined to avoid conflict with array size
+dataGSraw[24*TLC5940_N]={
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
+};
+DATA_GS_TYPE dataGS[16*TLC5940_N]={
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
 };
 /******************************************************************/
 
 /************************** APIs *******************************/
-void SystemConfig_TLC(void)
+void ConfigSystemTLC5940(void)
 {
 	/*
-	 * Set ACLK as configed in TLC5940_config.h
+	 *	Edit ACLK as configed in TLC5940_config.h
 	 */
-#if (GSCLK_SRC==1)
-	//ACLK=VLOCLK;
+#if (GSCLK_SRC==TASSEL_1)
 	BCSCTL1 &=~(XTS+DIVA1+DIVA0);
-	BCSCTL3 |= ACLK_SRC;                      // ACLK=VLO
+	BCSCTL3 |= ACLK_SRC;
 #endif
 
 	// Set GPIO direction, function and value
@@ -66,8 +77,7 @@ void SystemConfig_TLC(void)
 	// Timer A0 CCR0 to send LATCH signal
 	// Update Interval=(GSCLK_CYCLE)/(TA0CLK)
 	TA0CCR0=GSCLK_CYCLE;
-	//TA0CTL=TASSEL_1 + MC_1 + ID_0; // TA0CLK=ACLK
-	TA0CTL=TASSEL_2 + MC_1 + ID_0; // TA0CLK=SMCLK
+	TA0CTL=GSCLK_SRC + MC_1 + ID_0; // TA0CLK=SMCLK
 	TA0CCTL0 |= CCIE; // CCR0 interrupt enabled
 
 	// Config USCI B module - 3-pin, 8-bit SPI master
@@ -85,7 +95,7 @@ void DCInputCycle(void)
 	 * Comment out the following part if use default DC data
 	 */
 	P2OUT |= DCPRG_PIN + VPRG_PIN;
-	SerialTransmit(dataDC,TLC5940_N*12);
+	TransmitSerialData(dataDC,12*TLC5940_N);
 	P2OUT |= XLAT_PIN;
 	P2OUT &= ~XLAT_PIN;
 	// Switch from DC to GS mode
@@ -95,10 +105,11 @@ void DCInputCycle(void)
 void GSInputCycle(void)
 {
 	P1OUT &= ~BLANK_PIN;
+	GenGSDataRaw(dataGS,dataGSraw);
 	if (fDataGSUpd==GS_DATA_UPD_READY)
-		SerialTransmit(dataGS,TLC5940_N*24);
+		TransmitSerialData(dataGSraw,24*TLC5940_N);
 }
-void SerialTransmit(unsigned char *ptrData,unsigned char count)
+void TransmitSerialData(unsigned char *ptrData,unsigned char count)
 {
 	cntDataTLC=0;
 	while (cntDataTLC < count)
@@ -108,12 +119,34 @@ void SerialTransmit(unsigned char *ptrData,unsigned char count)
 		/*if ((P1IN & XERR_PIN) == 0)
     		error[DataCnt]=UCB0RXBUF;
     	else*/
-		bfrSerRx=UCB0RXBUF;
+		bfrSPIRx=UCB0RXBUF;
 		cntDataTLC++;
 	}
 	fXLAT=TLC_LATCH_READY;
 	fDataGSUpd=GS_DATA_UPD_WAIT;
 }
+
+void GenGSDataRaw(DATA_GS_TYPE *ptrData,unsigned char* ptrDataRaw)
+{
+	unsigned char cntData=0,cntDataRaw=0;
+	for (cntDataRaw=0;cntDataRaw<24*TLC5940_N;cntDataRaw++)
+	{
+		switch (cntDataRaw%3)
+		{
+		case 0:
+			ptrDataRaw[cntDataRaw]=ptrData[cntData]&0xff;
+			break;
+		case 1:
+			ptrDataRaw[cntDataRaw]=(ptrData[cntData]>>8)|(ptrData[cntData+1]<<4);
+			break;
+		case 2:
+			ptrDataRaw[cntDataRaw]=ptrData[cntData+1]>>4;
+			cntData+=2;
+			break;
+		}
+	}
+}
+
 /*void ErrorCheck(void)
 {
 	UCB0CTL1 &= ~UCSWRST; // clear SW, start fisrt serial transmission
@@ -121,7 +154,7 @@ void SerialTransmit(unsigned char *ptrData,unsigned char count)
 	{
 		cntDataTLC=0;
 		P1OUT &= ~BLANK_PIN; // blank all output
-		SerialTransmit(dataGS,TLC5940_N*24);
+		TransmitSerialData(dataGS,TLC5940_N*24);
 		P2OUT |= XLAT_PIN;
 		P2OUT &= ~XLAT_PIN;
 		P1OUT |= BLANK_PIN; // blank all output
