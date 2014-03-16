@@ -16,18 +16,20 @@ extern "C" {
 #define TLC5940_N       3
 // GS data bit-depth
 #define GS_BIT_DEPTH	8
-//==================================================================================================
-// Clock Routing
-//==================================================================================================
-#define GSCLK_SRC	TASSEL_1
+// TLC5940 clock setting
+#define CLOCK_SETTING	DEFAULT_LOW_POWER
+#if (CLOCK_SETTING==CUSTOM_CLOCK)
+	#define GSCLK_SRC	TASSEL_1
 //        	TASSEL_1:	ACLK
 //        	TASSEL_2:	SMCLK
-#if (GSCLK_SRC==TASSEL_1)
-	#define ACLK_SRC    LFXT1S_0
+	#if (GSCLK_SRC==TASSEL_1)
+		#define ACLK_SRC    LFXT1S_0
 //        	LFXT1S_0:	32768-Hz crystal on LFXT1
 //        	LFXT1S_2:	12000-Hz VLOCLK. This frequency is not preferable unless
 //						running with low GS bit-depth.
+	#endif
 #endif
+//	Error detection
 #define ERROR_DETECTION	0
 //			0: no error detection feature
 //			1: enable led open detection and thermal error flag
