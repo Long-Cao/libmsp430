@@ -11,10 +11,9 @@
 #include "TLC5940.h"
 
 /********************** Variable Definitions **********************/
-volatile bool /*fFirstCycle=false,*/ fXLAT=TLC_LATCH_WAIT, fDataGSUpd=GS_DATA_UPD_READY;
-unsigned char cntDataTLC=0, bfrSPIRx=0;
-unsigned char \
-dataDC[12*TLC5940_N]={
+volatile bool fFirstCycle=false,fXLAT=TLC_LATCH_WAIT,fDataGSUpd=GS_DATA_UPD_READY;
+unsigned char cntDataTLC=0;
+const unsigned char dataDC[12*TLC5940_N]={
 		//		Initial dot correction data = 50% default max output current.
 		//		The maximum output current per channel is programmed by a single resistor, R(IREF),
 		//		which is placed between IREF pin and GND pin. The voltage on IREF is set
@@ -34,7 +33,16 @@ dataDC[12*TLC5940_N]={
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
 		0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,	0x55,
-},
+};
+DATA_GS_TYPE dataGS[16*TLC5940_N]={
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
+		0,		0,		0,		0,		0,		0,		0,		0,
+};
+unsigned char
 dataGSraw[24*TLC5940_N]={
 		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
 		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
@@ -45,10 +53,7 @@ dataGSraw[24*TLC5940_N]={
 		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
 		0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,
 };
-DATA_GS_TYPE dataGS[16*TLC5940_N]={
-		0,		0,		0,		0,		0,		0,		0,		0,
-		0,		0,		0,		0,		0,		0,		0,		0,
-};
+
 /******************************************************************/
 
 /************************** APIs *******************************/
@@ -88,7 +93,7 @@ void ConfigSystemTLC5940(void)
 	UCB0CTL1|=UCSWRST;
 	UCB0CTL0=UCCKPH+UCMSB+UCMST+UCSYNC; // 3-pin, 8-bit SPI master
 	UCB0CTL1|=UCSSEL_2; // SMCLK
-	UCB0BR0=1;	// 16MHz SCLK
+	UCB0BR0=1;	// 8MHz SCLK
 	UCB0BR1=0;
 	UCB0CTL1&=~UCSWRST; // clear SW, start fisrt serial transmission
 }
@@ -99,36 +104,37 @@ void DCInputCycle(void)
 	 * Comment out the following part ifuse default DC data
 	 */
 	P2OUT|=DCPRG_PIN+VPRG_PIN;
-	TransmitSerialData(dataDC,12*TLC5940_N);
+	cntDataTLC=0;
+	for(cntDataTLC=0;cntDataTLC<12*TLC5940_N;cntDataTLC++)
+	{
+		UCB0TXBUF=dataDC[cntDataTLC];
+		while(!(IFG2 & UCB0TXIFG)); // TX buffer ready?
+		/*if((P1IN & XERR_PIN) == 0)
+	    		error[DataCnt]=UCB0RXBUF;
+	    	else*/
+	}
 	P2OUT|=XLAT_PIN;
 	P2OUT&=~XLAT_PIN;
 	// Switch from DC to GS mode
 	P2OUT&=~VPRG_PIN;
-	/*fFirstCycle=true;*/
+	fFirstCycle=true;
 }
 void GSInputCycle(void)
 {
 	P1OUT&=~BLANK_PIN;
-	GenGSDataRaw(dataGS,dataGSraw);
 	if(fDataGSUpd==GS_DATA_UPD_READY)
 	{
-		TransmitSerialData(dataGSraw,24*TLC5940_N);
+		GenGSDataRaw(dataGS,dataGSraw);
+		for(cntDataTLC=0;cntDataTLC<24*TLC5940_N;cntDataTLC++)
+		{
+			UCB0TXBUF=dataGSraw[cntDataTLC];
+			while(!(IFG2 & UCB0TXIFG)); // TX buffer ready?
+			/*if((P1IN & XERR_PIN) == 0)
+	    		error[DataCnt]=UCB0RXBUF;
+	    	else*/
+		}
 		fXLAT=TLC_LATCH_READY;
 		fDataGSUpd=GS_DATA_UPD_WAIT;
-	}
-}
-void TransmitSerialData(unsigned char *ptrData,unsigned char count)
-{
-	cntDataTLC=0;
-	while(cntDataTLC<count)
-	{
-		UCB0TXBUF=ptrData[cntDataTLC];
-		while(!(IFG2 & UCB0TXIFG)); // TX buffer ready?
-		/*if((P1IN & XERR_PIN) == 0)
-    		error[DataCnt]=UCB0RXBUF;
-    	else*/
-		bfrSPIRx=UCB0RXBUF;
-		cntDataTLC++;
 	}
 }
 
@@ -140,13 +146,13 @@ void GenGSDataRaw(DATA_GS_TYPE *ptrData,unsigned char *ptrDataRaw)
 		switch(cntDataRaw%3)
 		{
 		case 0:
-			ptrDataRaw[cntDataRaw]=ptrData[cntData]&0xff;
+			ptrDataRaw[cntDataRaw]=ptrData[cntData]>>4;
 			break;
 		case 1:
-			ptrDataRaw[cntDataRaw]=(ptrData[cntData]>>8)|(ptrData[cntData+1]<<4);
+			ptrDataRaw[cntDataRaw]=(ptrData[cntData]<<8)|(ptrData[cntData+1]>>8);
 			break;
 		case 2:
-			ptrDataRaw[cntDataRaw]=ptrData[cntData+1]>>4;
+			ptrDataRaw[cntDataRaw]=ptrData[cntData+1];
 			cntData+=2;
 			break;
 		}
@@ -183,7 +189,7 @@ __interrupt void GSCLK_Control(void)
 		P2OUT&=~XLAT_PIN;
 		fXLAT=TLC_LATCH_WAIT;
 	}
-	/*if(fFirstCycle==true)
+	if(fFirstCycle==true)
 	{
 		P1SEL&=~SCLK_PIN;
 		P1SEL2&=~SCLK_PIN;
@@ -192,7 +198,7 @@ __interrupt void GSCLK_Control(void)
 		P1SEL|=SCLK_PIN;
 		P1SEL2|=SCLK_PIN;
 		fFirstCycle=false;
-	}*/
+	}
 	P1OUT&=~BLANK_PIN;
 }
 

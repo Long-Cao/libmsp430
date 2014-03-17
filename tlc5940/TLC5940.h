@@ -13,7 +13,7 @@
 #ifndef TLC5940_API_H
 #define TLC5940_API_H
 
-#include <stdbool.h>		
+#include <stdbool.h>
 #include "TLC5940_config.h"
 #include "TLC5940_internal.h"
 
@@ -25,7 +25,7 @@ extern "C" {
 
 // FirstCycle flag is set to high for first GS cycle after DC input cycle,
 // add one additional SCLK pulse
-/*extern volatile bool fFirstCycle;*/
+extern volatile bool fFirstCycle;
 // Latch signal flag - indicate a necessary signal when in state TLC_LATCH_READY
 extern volatile bool fXLAT;
 
@@ -34,7 +34,7 @@ extern volatile bool fDataGSUpd;
 extern unsigned char cntDataTLC;
 // DC data
 // Size of array=96 bits x number of TLC=12 bytes * number of TLC
-extern unsigned char dataDC[12*TLC5940_N];
+extern const unsigned char dataDC[12*TLC5940_N];
 // GS raw data: used for serial transmission
 // Size of array=192 bits x number of TLC=24 bytes * number of TLC
 extern unsigned char dataGSraw[24*TLC5940_N];
@@ -42,11 +42,7 @@ extern unsigned char dataGSraw[24*TLC5940_N];
 // Size: 	(bit-depth <=8) 1 byte x 16 channel x number of TLC
 //			(8<=bit-depth<=12) 2 byte x 16 channel x number of TLC
 extern DATA_GS_TYPE dataGS[16*TLC5940_N];
-//
-extern unsigned char bfrSPIRx;
 /*******************************************************************/
-
-
 
 /********************** API Declarations **********************/
 // Configure watchdog timer, system clocks, ports, timer and USCI modules
@@ -55,8 +51,6 @@ extern void ConfigSystemTLC5940(void);
 extern void DCInputCycle(void);
 
 extern void GSInputCycle(void);
-
-extern void TransmitSerialData(unsigned char *ptrData,unsigned char count);
 
 extern void GenGSDataRaw(DATA_GS_TYPE *ptrData,unsigned char* ptrDataRaw);
 /************************************************************/
