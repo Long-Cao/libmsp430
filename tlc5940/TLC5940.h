@@ -13,7 +13,7 @@
 #ifndef TLC5940_API_H
 #define TLC5940_API_H
 
-#include <stdbool.h>
+#include <stdbool.h>		
 #include "TLC5940_config.h"
 #include "TLC5940_internal.h"
 
@@ -42,7 +42,11 @@ extern unsigned char dataGSraw[24*TLC5940_N];
 // Size: 	(bit-depth <=8) 1 byte x 16 channel x number of TLC
 //			(8<=bit-depth<=12) 2 byte x 16 channel x number of TLC
 extern DATA_GS_TYPE dataGS[16*TLC5940_N];
+//
+extern unsigned char bfrSPIRx;
 /*******************************************************************/
+
+
 
 /********************** API Declarations **********************/
 // Configure watchdog timer, system clocks, ports, timer and USCI modules

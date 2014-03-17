@@ -28,9 +28,9 @@ extern "C" {
 #define TLC_LATCH_READY	1
 #define	TLC_LATCH_WAIT	0
 // Clock settings
-#define CUSTOM_CLOCK				2
-#define DEFAULT_HIGH_PERFORMANCE	1
 #define DEFAULT_LOW_POWER			0
+#define DEFAULT_HIGH_PERFORMANCE	1
+#define CUSTOM_CLOCK				2
 
 /*
  * Macros
